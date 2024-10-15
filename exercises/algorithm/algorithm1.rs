@@ -2,11 +2,10 @@
 	single linked list merge
 	This problem requires you to merge two ordered singly linked lists into one ordered singly linked list
 */
-// I AM NOT DONE
+
 
 use std::fmt::{self, Display, Formatter};
 use std::ptr::NonNull;
-use std::vec::*;
 
 #[derive(Debug)]
 struct Node<T> {
@@ -22,37 +21,28 @@ impl<T> Node<T> {
         }
     }
 }
+
 #[derive(Debug)]
 struct LinkedList<T> {
-    length: u32,
     start: Option<NonNull<Node<T>>>,
     end: Option<NonNull<Node<T>>>,
+    length: u32,
 }
 
-impl<T> Default for LinkedList<T> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl<T> LinkedList<T> {
-    pub fn new() -> Self {
-        Self {
-            length: 0,
+impl<T: Ord + Clone> LinkedList<T> {
+    fn new() -> Self {
+        LinkedList {
             start: None,
             end: None,
+            length: 0,
         }
     }
 
-    pub fn add(&mut self, obj: T) {
-        let mut node = Box::new(Node::new(obj));
-        node.next = None;
-        let node_ptr = Some(unsafe { NonNull::new_unchecked(Box::into_raw(node)) });
-        match self.end {
-            None => self.start = node_ptr,
-            Some(end_ptr) => unsafe { (*end_ptr.as_ptr()).next = node_ptr },
-        }
-        self.end = node_ptr;
+    fn push(&mut self, val: T) {
+        let mut new_node = Box::new(Node::new(val));
+        new_node.next = self.start;
+        let new_node = Some(Box::leak(new_node).into());
+        self.start = new_node;
         self.length += 1;
     }
 
@@ -69,15 +59,58 @@ impl<T> LinkedList<T> {
             },
         }
     }
-	pub fn merge(list_a:LinkedList<T>,list_b:LinkedList<T>) -> Self
-	{
-		//TODO
-		Self {
-            length: 0,
-            start: None,
-            end: None,
+
+    pub fn merge(list_a: LinkedList<T>, list_b: LinkedList<T>) -> Self {
+        let mut list_c = LinkedList::new();
+        let mut ptr_a = list_a.start;
+        let mut ptr_b = list_b.start;
+
+        while ptr_a.is_some() && ptr_b.is_some() {
+            let val_a = unsafe { ptr_a.unwrap().as_ref().val.clone() };
+            let val_b = unsafe { ptr_b.unwrap().as_ref().val.clone() };
+            if val_a < val_b {
+                list_c.add(val_a);
+                ptr_a = unsafe { ptr_a.unwrap().as_ref().next };
+            } else {
+                list_c.add(val_b);
+                ptr_b = unsafe { ptr_b.unwrap().as_ref().next };
+            }
         }
-	}
+
+        while let Some(ptr) = ptr_a {
+            let val = unsafe { ptr.as_ref().val.clone() };
+            list_c.add(val);
+            ptr_a = unsafe { ptr.as_ref().next };
+        }
+
+        while let Some(ptr) = ptr_b {
+            let val = unsafe { ptr.as_ref().val.clone() };
+            list_c.add(val);
+            ptr_b = unsafe { ptr.as_ref().next };
+        }
+
+        list_c
+    }
+
+    fn add(&mut self, val: T) {
+        let mut new_node = Box::new(Node::new(val));
+        new_node.next = None;
+
+        let new_node = Some(Box::leak(new_node).into());
+
+        match self.end {
+            None => {
+                self.start = new_node;
+                self.end = new_node;
+            }
+            Some(end) => unsafe {
+                (*end.as_ptr()).next = new_node;
+                self.end = new_node;
+            },
+        }
+
+        self.length += 1;
+    }
 }
 
 impl<T> Display for LinkedList<T>
@@ -85,10 +118,14 @@ where
     T: Display,
 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self.start {
-            Some(node) => write!(f, "{}", unsafe { node.as_ref() }),
-            None => Ok(()),
+        let mut current = self.start;
+        while let Some(node) = current {
+            unsafe {
+                write!(f, "{} -> ", node.as_ref().val)?;
+                current = node.as_ref().next;
+            }
         }
+        write!(f, "None")
     }
 }
 
@@ -97,10 +134,7 @@ where
     T: Display,
 {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self.next {
-            Some(node) => write!(f, "{}, {}", self.val, unsafe { node.as_ref() }),
-            None => write!(f, "{}", self.val),
-        }
+        write!(f, "{}", self.val)
     }
 }
 
